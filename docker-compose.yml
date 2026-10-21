@@ -20,7 +20,8 @@ services:
       # The Demo Mode toggle lives in the testing router (upstream's prod mode
       # mounts it too).
       ENABLE_TESTING_ROUTES: ${ENABLE_TESTING_ROUTES:-1}
-      FAD_SCRAPER_SHOW_BROWSER: ${FAD_SCRAPER_SHOW_BROWSER:-0}
+      # Headed on the container's Xvfb: a genuine Chrome, not "HeadlessChrome".
+      FAD_SCRAPER_SHOW_BROWSER: ${FAD_SCRAPER_SHOW_BROWSER:-1}
       FAD_SCRAPER_PROFILE_DIR: ${FAD_SCRAPER_PROFILE_DIR:-/data/browser-profiles}
       FAD_SCRAPER_NATIVE_UA: ${FAD_SCRAPER_NATIVE_UA:-1}
       TZ: Asia/Jerusalem

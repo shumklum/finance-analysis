@@ -35,7 +35,7 @@ docker compose --profile test run --rm test e2e    # + Playwright e2e
 ## What lives where
 
 | Path in `${FAD_DATA_DIR}` | What |
-|---|---|
+| --- | --- |
 | `*.db` | SQLite database (back this up) |
 | `keyring/` | encrypted keyring file: bank passwords + the DB field-encryption key, unlocked by `KEYRING_CRYPTFILE_PASSWORD` |
 | `browser-profiles/<provider>-<hash>/` | persistent Chrome profiles (bank device trust) |
@@ -47,15 +47,14 @@ Lose `KEYRING_CRYPTFILE_PASSWORD` and the stored credentials can't be decrypted
 ## Fork additions (scrapers)
 
 | Env | Default here | Effect |
-|---|---|---|
+| --- | --- | --- |
 | `FAD_SCRAPER_PROFILE_DIR` | `/data/browser-profiles` | keep one Chrome profile per bank login, so device-trust banks (Hapoalim) ask for the SMS code once, not every run. Unset = upstream behaviour (fresh browser). |
-| `FAD_SCRAPER_NATIVE_UA` | `1` | keep Chrome's real user agent instead of upstream's fixed macOS one, which contradicts a Linux browser's other signals |
-| `FAD_SCRAPER_SHOW_BROWSER` | `0` | run Chrome headed on the container's Xvfb display |
+| `FAD_SCRAPER_SHOW_BROWSER` | `1` | run Chrome headed on the container's Xvfb display: a genuine `Chrome/…` agent (headless announces `HeadlessChrome/…`) and real rendering |
+| `FAD_SCRAPER_NATIVE_UA` | `1` | when headed, keep Chrome's real (Linux) user agent instead of upstream's fixed macOS one, which contradicts the browser's other signals. Headless always uses the fixed one. |
 
 **Watching a scrape:** set `VNC_PASSWORD` in `.env`, `docker compose up -d`,
 then `ssh -L 5909:127.0.0.1:5909 <host>` and open `vnc://localhost:5909`
-(macOS Screen Sharing). Useful with `FAD_SCRAPER_SHOW_BROWSER=1` for a first
-Hapoalim login.
+(macOS Screen Sharing). Handy for a first Hapoalim login.
 
 **Never retry a failed bank login in a loop**: wrong codes or passwords can
 lock the account or arm the bank's 24h OTP block.

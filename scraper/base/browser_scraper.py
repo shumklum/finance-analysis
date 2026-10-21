@@ -153,10 +153,12 @@ class BrowserScraper(BaseScraper):
             "viewport": {"width": 1024, "height": 768},
             "locale": "he-IL",
         }
-        # FAD_SCRAPER_NATIVE_UA=1 keeps Chrome's own user agent. The fixed one
-        # claims macOS while a Linux server's navigator.platform and client
-        # hints say otherwise — a mismatch fraud detection flags.
-        if os.environ.get("FAD_SCRAPER_NATIVE_UA") != "1":
+        # FAD_SCRAPER_NATIVE_UA=1 keeps Chrome's own user agent when headed. The
+        # fixed one claims macOS while a Linux server's navigator.platform and
+        # client hints say otherwise — a mismatch fraud detection flags. Headless
+        # Chrome's own agent says "HeadlessChrome", so headless keeps the fixed one.
+        native_ua = os.environ.get("FAD_SCRAPER_NATIVE_UA") == "1" and self.options.show_browser
+        if not native_ua:
             context_options["user_agent"] = self._DEFAULT_USER_AGENT
         profile_dir = browser_profile_dir(self.provider, self.credentials)
 
