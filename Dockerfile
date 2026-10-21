@@ -31,7 +31,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # way to watch them. Culmus/Noto: Hebrew glyphs for bank pages and screenshots.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
-      tini xvfb x11vnc fonts-culmus fonts-noto-core ca-certificates curl \
+      tini xvfb x11vnc culmus fonts-noto-core ca-certificates curl \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
