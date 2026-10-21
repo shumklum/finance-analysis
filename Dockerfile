@@ -90,4 +90,6 @@ RUN cd frontend && npx playwright install --with-deps --only-shell chromium
 # CI's choice: a plaintext keyring is fine for throwaway test data.
 ENV PYTHON_KEYRING_BACKEND=keyrings.alt.file.PlaintextKeyring \
     CI=true
-CMD ["docker/run-tests.sh"]
+# Entrypoint, so `run --rm test e2e` passes "e2e" to the script.
+ENTRYPOINT ["docker/run-tests.sh"]
+CMD []
