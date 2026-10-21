@@ -57,11 +57,13 @@ COPY backend/ backend/
 COPY scraper/ scraper/
 COPY --from=frontend /src/frontend/dist frontend/dist
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY docker/fa_keyring.py /opt/fa/fa_keyring.py
 
 USER app
 ENV FAD_USER_DIR=/data \
+    PYTHONPATH=/opt/fa \
     KEYRING_CRYPTFILE_PATH=/data/keyring/cryptfile_pass.cfg \
-    PYTHON_KEYRING_BACKEND=keyrings.cryptfile.cryptfile.CryptFileKeyring \
+    PYTHON_KEYRING_BACKEND=fa_keyring.EnvCryptFileKeyring \
     ENVIRONMENT=production \
     DISPLAY=:99
 EXPOSE 8080
