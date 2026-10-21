@@ -1,0 +1,45 @@
+# Self-hosted Finance Analysis. Secrets come from .env (see docker/env.template);
+# data lives in ${FAD_DATA_DIR}. Ports bind to loopback only — reach them over
+# ssh -L or put a reverse proxy in front. See docker/README.md.
+name: finance-analysis
+
+services:
+  app:
+    build:
+      context: .
+      target: app
+    image: finance-analysis:local
+    restart: unless-stopped
+    init: false            # tini is the entrypoint
+    shm_size: 1gb          # Chrome
+    environment:
+      FAD_API_TOKEN: ${FAD_API_TOKEN:?set FAD_API_TOKEN in .env}
+      KEYRING_CRYPTFILE_PASSWORD: ${KEYRING_CRYPTFILE_PASSWORD:?set KEYRING_CRYPTFILE_PASSWORD in .env}
+      VNC_PASSWORD: ${VNC_PASSWORD:-}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1}
+      # The Demo Mode toggle lives in the testing router (upstream's prod mode
+      # mounts it too).
+      ENABLE_TESTING_ROUTES: ${ENABLE_TESTING_ROUTES:-1}
+      FAD_SCRAPER_SHOW_BROWSER: ${FAD_SCRAPER_SHOW_BROWSER:-0}
+      FAD_SCRAPER_PROFILE_DIR: ${FAD_SCRAPER_PROFILE_DIR:-/data/browser-profiles}
+      FAD_SCRAPER_NATIVE_UA: ${FAD_SCRAPER_NATIVE_UA:-1}
+      TZ: Asia/Jerusalem
+    volumes:
+      - ${FAD_DATA_DIR:-./data}:/data
+    ports:
+      - "127.0.0.1:${FAD_PORT:-8090}:8080"
+      - "127.0.0.1:${FAD_VNC_PORT:-5909}:5900"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    logging:
+      driver: json-file
+      options: {max-size: 20m, max-file: "5"}
+
+  test:
+    profiles: [test]
+    build:
+      context: .
+      target: test
+    image: finance-analysis:test
+    shm_size: 1gb

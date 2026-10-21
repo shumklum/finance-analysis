@@ -1,4 +1,7 @@
+import hashlib
+import json
 import logging
+import os
 import random
 import re
 from dataclasses import dataclass
@@ -23,6 +26,33 @@ from scraper.utils import (
 logger = logging.getLogger(__name__)
 
 LoginResultCheck = Union[str, re.Pattern, Callable[..., Awaitable[bool]]]
+
+# Credential fields that never feed a browser-profile directory name.
+_SECRET_CREDENTIAL_FIELDS = frozenset({"password", "secret", "otp_key", "otpLongTermToken"})
+
+
+def browser_profile_dir(provider: str, credentials: dict) -> Optional[str]:
+    """Return the persistent Chrome profile directory for one login, if enabled.
+
+    ``FAD_SCRAPER_PROFILE_DIR`` turns persistent profiles on (server/Docker
+    deployments). Banks such as Hapoalim tie their new-device trust to the
+    browser's cookies and storage, so a fresh profile per run re-triggers the
+    SMS challenge every time; a kept profile asks once. One directory per
+    provider + login, named by a hash of the non-secret credential fields so
+    usernames don't appear on disk and two logins at one bank never share
+    cookies.
+    """
+    root = os.environ.get("FAD_SCRAPER_PROFILE_DIR")
+    if not root:
+        return None
+    identity = {
+        k: v for k, v in credentials.items()
+        if k not in _SECRET_CREDENTIAL_FIELDS and isinstance(v, str)
+    }
+    digest = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()[:12]
+    path = os.path.join(root, f"{provider}-{digest}")
+    os.makedirs(path, mode=0o700, exist_ok=True)
+    return path
 
 
 def _redact_url(url: str) -> str:
@@ -119,18 +149,37 @@ class BrowserScraper(BaseScraper):
         """
         self._playwright = await async_playwright().start()
 
+        context_options: dict[str, Any] = {
+            "viewport": {"width": 1024, "height": 768},
+            "locale": "he-IL",
+        }
+        # FAD_SCRAPER_NATIVE_UA=1 keeps Chrome's own user agent. The fixed one
+        # claims macOS while a Linux server's navigator.platform and client
+        # hints say otherwise — a mismatch fraud detection flags.
+        if os.environ.get("FAD_SCRAPER_NATIVE_UA") != "1":
+            context_options["user_agent"] = self._DEFAULT_USER_AGENT
+        profile_dir = browser_profile_dir(self.provider, self.credentials)
+
         last_exc: Optional[Exception] = None
         for channel in self._BROWSER_CHANNELS:
+            launch_options: dict[str, Any] = {
+                "channel": channel,
+                "headless": not self.options.show_browser,
+                "args": [
+                    "--disable-blink-features=AutomationControlled",
+                    "--no-first-run",
+                    "--no-default-browser-check",
+                ],
+            }
             try:
-                self.browser = await self._playwright.chromium.launch(
-                    channel=channel,
-                    headless=not self.options.show_browser,
-                    args=[
-                        "--disable-blink-features=AutomationControlled",
-                        "--no-first-run",
-                        "--no-default-browser-check",
-                    ],
-                )
+                if profile_dir:
+                    # A persistent context IS the browser here; terminate()
+                    # only needs its close().
+                    self.browser = await self._playwright.chromium.launch_persistent_context(
+                        profile_dir, **launch_options, **context_options
+                    )
+                else:
+                    self.browser = await self._playwright.chromium.launch(**launch_options)
                 logger.info("scraper using channel=%s", channel)
                 break
             except Exception as exc:
@@ -164,13 +213,13 @@ class BrowserScraper(BaseScraper):
             ) from last_exc
 
         try:
-            context = await self.browser.new_context(
-                user_agent=self._DEFAULT_USER_AGENT,
-                viewport={"width": 1024, "height": 768},
-                locale="he-IL",
-            )
+            if profile_dir:
+                context = self.browser
+            else:
+                context = await self.browser.new_context(**context_options)
             await context.add_init_script(self._STEALTH_INIT_SCRIPT)
-            self.page = await context.new_page()
+            # A persistent context opens with one blank tab; reuse it.
+            self.page = context.pages[0] if profile_dir and context.pages else await context.new_page()
             self.page.set_default_timeout(self.options.default_timeout)
         except Exception:
             # Post-launch setup failed: the browser (and playwright) are

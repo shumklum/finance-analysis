@@ -656,7 +656,9 @@ class ScraperAdapter:
         """
         options = options_cls(
             start_date=self.start_date,
-            show_browser=False,
+            # Headed scrapes on a server need a display (the Docker image runs
+            # Xvfb); some banks trust a headed browser more.
+            show_browser=os.environ.get("FAD_SCRAPER_SHOW_BROWSER") == "1",
         )
 
         if AppConfig().is_demo_mode and "test_" not in self.provider_name:
