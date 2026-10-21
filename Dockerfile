@@ -77,7 +77,10 @@ FROM base AS test
 ARG NODE_VERSION
 COPY --from=node:22-bookworm-slim /usr/local/bin/node /usr/local/bin/node
 COPY --from=node:22-bookworm-slim /usr/local/lib/node_modules /usr/local/lib/node_modules
-RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
+# git: tests/scripts/test_prod_server.py builds throwaway repos.
+RUN apt-get update && apt-get install -y --no-install-recommends git \
+ && rm -rf /var/lib/apt/lists/* \
+ && ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
  && ln -s ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx \
  && /opt/poetry/bin/poetry install --no-root --with dev --no-interaction
 COPY --from=frontend /src/frontend/node_modules frontend/node_modules
